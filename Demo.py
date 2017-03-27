@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore")
 import argparse
 import numpy as np
 
-from Tools import logstring
+from Tools import log_string
 from Tools import print_log
 
 import Usps
@@ -63,45 +63,31 @@ def benchmark(path):
     test(path)
 
 
-def test(path):
-    """ Test the performance of the classifier saved to disc.
+def train(path):
+    """ Train the classifier, saving the results to disk.
     Args:
-        path (str): The path to load the classifier from.
+        path (str): The path to save the model to.
     """
     # load patterns
-    test_patterns, test_classifications \
-        = Usps.load_test_data(pos_label=__pos_label__,
-                              neg_label=__neg_label__,
-                              max_patterns=__max_patterns__)
-    # load classifier
-    pred = gpc.Classifier.load(path)
-    # print parameters
-    print logstring(), "using logsigmaf:", pred.data.kernel.__kernel__.logsigmaf
-    print logstring(), "using logl:", pred.data.kernel.__kernel__.logl
-    # print log marginal likelihood and derivatives
-    derivatives = pred.log_marginal_likelihood_deriv()
-    print logstring(), "log marginal likelihood:", pred.log_marginal_likelihood()
-    print logstring(), "dlogsigmaf:", derivatives[0]
-    print logstring(), "dlogl:", derivatives[1]
-    # print information and errors
-    predicted_probabilities \
-        = [pred.predict(pattern) for pattern in test_patterns]
-    predicted_classifications \
-        = [pred.threshold(probability) for probability in predicted_probabilities]
-    results \
-        = np.subtract(predicted_classifications, test_classifications)  # an error if opposite signs
-    num_errors = np.count_nonzero(results)
-    information = -1.0 * np.average(np.log2(predicted_probabilities))
-    print logstring(), "average Information (bytes):", information
-    # print performance summary
-    num_test_patterns = len(test_classifications)
-    num_correct_classifications = num_test_patterns - num_errors
-    percent = 100.0 * float(num_correct_classifications) / float(num_test_patterns)
-    print logstring(), "correctly classified:", num_correct_classifications,\
-        "of", num_test_patterns, "digits"
-    print logstring(), "correctly classified:", percent, "%"
-    # print mis-classifications
-    print logstring(), "mis-classification indices:", list(np.nonzero(results)[0])
+    training_patterns, training_classifications \
+        = Usps.load_training_data(pos_label=__pos_label__,
+                                  neg_label=__neg_label__,
+                                  max_patterns=__max_patterns__)
+    # observation_vector is D rows, n cols
+    training_patterns = np.transpose(training_patterns)
+    # train the model
+    print log_string(), "training..."
+    kernel = gpc.SquaredExponentialKernel()
+    params = gpc.Classifier.train(kernel, training_patterns, training_classifications)
+    # print results
+    print log_string(), "optimal log_sigma_f:", params[0]
+    print log_string(), "optimal log_l:", params[1]
+    # save the predictor
+    kernel.set_params(params)
+    data = gpc.DerivedData(training_patterns, training_classifications, kernel)
+    pred = gpc.Classifier(data)
+    pred.save(path)
+    print_log("saved classifier...")
 
 
 def peek(path, pattern_idx):
@@ -129,33 +115,63 @@ def peek(path, pattern_idx):
               max_patterns=__max_patterns__)
 
 
-def train(path):
-    """ Train the classifer, saving the results to disk.
+def show(prompt, path, indices):
+    """ Show the user randomly selected patterns from the subset of indices.
     Args:
-        path (str): The path to save the model to.
+        prompt (str): The indices of the in-correctly classified patterns.
+        path (str): The path to load the classifier from.
+        indices (int): The indices of the patterns
+    """
+    while True:
+        if raw_input(prompt) != "y":
+            break
+        index = np.random.choice(indices)
+        peek(path, index)
+
+
+def test(path):
+    """ Test the performance of the classifier saved to disc.
+    Args:
+        path (str): The path to load the classifier from.
     """
     # load patterns
-    training_patterns, training_classifications \
-        = Usps.load_training_data(pos_label=__pos_label__,
-                                  neg_label=__neg_label__,
-                                  max_patterns=__max_patterns__)
-    # observation_vector is D rows, n cols
-    training_patterns = np.transpose(training_patterns)
-    # train the model
-    print logstring(), "training..."
-    kernel = gpc.SquaredExponentialKernel()
-    params = gpc.Classifier.train(kernel, training_patterns, training_classifications)
-    # print results
-    print logstring(), "optimal logsigmaf:", params[0]
-    print logstring(), "optimal logl:", params[1]
-    # save the predictor
-    kernel.set_params(params)
-    data = gpc.DerivedData(training_patterns, training_classifications, kernel)
-    pred = gpc.Classifier(data)
-    pred.save(path)
-    print_log("saved classifier...")
-    # run test
-    test(path)
+    test_patterns, test_classifications \
+        = Usps.load_test_data(pos_label=__pos_label__,
+                              neg_label=__neg_label__,
+                              max_patterns=__max_patterns__)
+    # load classifier
+    pred = gpc.Classifier.load(path)
+    # print parameters
+    print "*** using log_sigma_f:", pred.data.kernel.__kernel__.log_sigma_f
+    print "*** using log_l:", pred.data.kernel.__kernel__.log_l
+    # print log marginal likelihood and derivatives
+    derivatives = pred.log_marginal_likelihood_deriv()
+    print "*** log marginal likelihood:", pred.log_marginal_likelihood()
+    print "*** derivative log_sigma_f:", derivatives[0]
+    print "*** derivative log_l:", derivatives[1]
+    # print information and errors
+    predicted_probabilities \
+        = [pred.predict(pattern) for pattern in test_patterns]
+    predicted_classifications \
+        = [pred.threshold(probability) for probability in predicted_probabilities]
+    results \
+        = np.subtract(predicted_classifications, test_classifications)  # an error if opposite signs
+    num_errors = np.count_nonzero(results)
+    information = -1.0 * np.average(np.log2(predicted_probabilities))
+    print "*** average Information (bytes):", information
+    # print performance summary
+    num_test_patterns = len(test_classifications)
+    num_correct_classifications = num_test_patterns - num_errors
+    percent = 100.0 * float(num_correct_classifications) / float(num_test_patterns)
+    print "*** correctly classified:", num_correct_classifications,\
+        "of", num_test_patterns, "digits"
+    print "*** correctly classified:", percent, "%"
+    show("*** View a randomly selected, correctly classified digit (y)? ",
+         path,
+         list(set(range(0, num_test_patterns)) - set(list(np.nonzero(results)[0]))))
+    show("*** View a randomly selected, __in-correctly__ classified digit (y)? ",
+         path,
+         list(np.nonzero(results)[0]))
 
 
 def main():

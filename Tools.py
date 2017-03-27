@@ -10,7 +10,7 @@
 import datetime
 
 
-def logstring():
+def log_string():
     """ The prefix for a log-entry.
     Returns:
         (string): The log-string
@@ -23,7 +23,7 @@ def print_log(message):
     Args:
         message (str): The message.
     """
-    print logstring(), message
+    print log_string(), message
 
 
 def print_matrix_shape(message, matrix):

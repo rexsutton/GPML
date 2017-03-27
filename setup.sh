@@ -21,14 +21,14 @@ fi
 wget 'http://www.gaussianprocess.org/gpml/data/usps_resampled.tar.bz2'
 if [[ $? != 0 ]]
 then
-    echo "Failed to download USPS data."
+    echo "Failed to download demo data."
     exit
 fi
 # de-compress the data
 tar -xjf usps_resampled.tar.bz2
 if [[ $? != 0 ]]
 then
-    echo "Failed to de-compress USPS data."
+    echo "Failed to de-compress demo data."
     exit
 fi
-echo "*** Training data downloaded and de-compressed successfully. ***"
+echo "*** Demo data downloaded and de-compressed successfully. ***"

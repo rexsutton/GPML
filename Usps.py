@@ -4,7 +4,7 @@
 
    Copyright (c) Rex Sutton 2016.
 
-   Python interdace to USPS data.
+   Python interface to USPS data.
 
    The *_patterns variables contain a raster scan
     of the 16 by 16 grey level pixel intensities,

@@ -20,7 +20,7 @@ import numpy as np
 from scipy.optimize import minimize
 from scipy import linalg
 
-from Tools import logstring
+from Tools import log_string
 from Tools import print_vector_shape
 from Tools import print_matrix_shape
 
@@ -33,7 +33,7 @@ def dot_matrix_diag(matrix, diag):
     """ Dot product of matrix wih diagonal matrix.
     Args:
         matrix (matrix): The matrix.
-        diag (vector): The vector.
+        diag (vector): Vector containing the diagonal.
     Returns:
         The dot product
     """
@@ -43,7 +43,7 @@ def dot_matrix_diag(matrix, diag):
 def dot_diag_matrix(diag, matrix):
     """ Dot product of diagonal matrix with matrix.
     Args:
-        diag (vector): The vector.
+        diag (vector): Vector containing the diagonal.
         matrix (matrix): The matrix.
     Returns:
         The dot product
@@ -82,14 +82,14 @@ class SquaredExponentialKernel(object):
     """
 
     def __init__(self):
-        """Initialise the kernel functor with parameter values.
+        """Initialise the kernel functor.
         """
-        self.logsigmaf = None
-        self.logl = None
-        self.sigmafsq = None
-        self.twosigmafsq = None
-        self.negtwolsq = None
-        self.twologsigmaf = None
+        self.log_sigma_f = None
+        self.log_l = None
+        self.sigma_f_squared = None
+        self.two_sigma_f_squared = None
+        self.neg_two_l_squared = None
+        self.two_log_sigma_f = None
 
     @staticmethod
     def num_params():
@@ -102,19 +102,19 @@ class SquaredExponentialKernel(object):
         Args:
             params: The parameters.
         """
-        self.logsigmaf = params[0]
-        self.logl = params[1]
-        self.sigmafsq = np.exp(2.0 * self.logsigmaf)
-        self.twosigmafsq = 2.0 * self.sigmafsq
-        self.negtwolsq = -2.0 * np.exp(2.0 * self.logl)
-        self.twologsigmaf = 2.0 * self.logsigmaf
+        self.log_sigma_f = params[0]
+        self.log_l = params[1]
+        self.sigma_f_squared = np.exp(2.0 * self.log_sigma_f)
+        self.two_sigma_f_squared = 2.0 * self.sigma_f_squared
+        self.neg_two_l_squared = -2.0 * np.exp(2.0 * self.log_l)
+        self.two_log_sigma_f = 2.0 * self.log_sigma_f
 
     def compute(self, lhs, rhs, compute_diag, compute_derivatives):
-        """Compute the kernel for observation vectors, assumed to be same length.
+        """Compute the kernel and derivatives for observation vectors, assumed to be same length.
         Args:
             lhs (vector): The first observation vector.
             rhs (vector): The second observation vector.
-            compute_diag(bool): Hint to indicate the rhs is the lhs
+            compute_diag(bool): Hint to indicate the rhs is the lhs.
             compute_derivatives(bool): If True compute derivatives.
         Returns:
              The kernel value and derivatives with respect to the hyper-parameters.
@@ -122,21 +122,21 @@ class SquaredExponentialKernel(object):
         derivatives = np.empty([2], __precision__)
 
         if compute_diag:
-            kernel = self.sigmafsq
+            kernel = self.sigma_f_squared
 
             if compute_derivatives:
-                derivatives[0] = self.twosigmafsq
+                derivatives[0] = self.two_sigma_f_squared
                 derivatives[1] = 0.0
         else:
             tmp = lhs - rhs
-            magnitude_term = np.dot(tmp, tmp) / self.negtwolsq
-            exponent = self.twologsigmaf + magnitude_term
+            magnitude_term = np.dot(tmp, tmp) / self.neg_two_l_squared
+            exponent = self.two_log_sigma_f + magnitude_term
             kernel = np.exp(exponent)
 
             if compute_derivatives:
-                twokernel = 2.0 * kernel
-                derivatives[0] = twokernel
-                derivatives[1] = -twokernel * magnitude_term
+                two_kernel = 2.0 * kernel
+                derivatives[0] = two_kernel
+                derivatives[1] = -two_kernel * magnitude_term
 
         return kernel, derivatives
 
@@ -147,7 +147,7 @@ class KernelDecorator(object):
     """
 
     def __init__(self, kernel):
-        """Initialise the kernel functor with parameter values.
+        """Initialise the kernel decorator with a kernel.
         Args:
             kernel (function): The kernel function.
         """
@@ -176,7 +176,7 @@ class KernelDecorator(object):
         return value
 
     def compute_covariance_vector(self, observation_matrix, observation):
-        """Apply the kernel to each observation in the matrix with the observation.
+        """Apply the kernel to each pair of observations formed from the matrix and the observation.
         Args:
             observation_matrix (matrix): The vector of N observations,
                 first index is the number of observations.
@@ -192,7 +192,7 @@ class KernelDecorator(object):
         return covariance_vector
 
     def compute_covariance_matrix(self, observation_matrix):
-        """Apply the kernel to each observation element wise, and return derivatives.
+        """Apply the kernel to each observation pair, and return derivatives.
         Args:
             observation_matrix (matrix): Matrix of N observations.
         Returns:
@@ -328,7 +328,7 @@ def log_likelihood_second_deriv(f_vec):
     Args:
         f_vec (vector): The value of latent function f at x_i with classification y_i.
     Returns:
-        vector: The digaonal of the matrix of second derivatives.
+        vector: The diagonal of the matrix of second derivatives.
     """
     pi_vec = logistic(f_vec)
     opi_vec = pi_vec - 1.0
@@ -341,7 +341,7 @@ def log_likelihood_third_deriv(f_vec):
     Args:
         f_vec (vector): The value of latent function f at x_i with classification y_i.
     Returns:
-        vector: The digaonal of the matrix of third derivatives.
+        vector: The diagonal of the matrix of third derivatives.
     """
     pi_vec = logistic(f_vec)
     opi_vec = 1.0 - pi_vec
@@ -350,7 +350,7 @@ def log_likelihood_third_deriv(f_vec):
 
 
 def compute_r_matrix(w_sqrt_diag, l_matrix):
-    """ Compute the matrix descriving the posterior variance.
+    """ Compute the matrix describing the posterior variance.
     Args:
         w_sqrt_diag (vector): The square root of the diagonal of the W matrix.
         l_matrix (matrix): The Cholesky factored matrix.
@@ -360,7 +360,7 @@ def compute_r_matrix(w_sqrt_diag, l_matrix):
     return dot_diag_matrix(w_sqrt_diag, dot_factored_matrix(l_matrix, np.diag(w_sqrt_diag)))
 
 
-def findfhat(initial_guess, cov_matrix, y_vec):
+def find_fhat(initial_guess, cov_matrix, y_vec):
     """Find the mean of the approximate posterior using Newton's method.
     Args:
         initial_guess (vector): The initial guess for fhat.
@@ -470,10 +470,10 @@ def hyper_param_deriv(covariance_matrix,
 
 
 class TrainingObjective(object):  # pylint: disable=too-few-public-methods
-    """Initialise the members.
+    """Objective function for training, provides `warm-start' for fhat.
     """
     def __init__(self, patterns, classifications, kernel):
-        """Objective function gradients for training the model.
+        """Memberwise initialisation.
         Args:
             patterns (matrix): The training observations.
             classifications (vector): The vector of classifications.
@@ -496,10 +496,11 @@ class TrainingObjective(object):  # pylint: disable=too-few-public-methods
         self.kernel.set_params(params)
         data = DerivedData(self.patterns, self.classifications, self.kernel)
         pred = Classifier(data, self.fhat)
+        # cache fhat as the initial guess for subsequent invocations.
         self.fhat = pred.fhat
         value = pred.log_marginal_likelihood()
         derivatives = pred.log_marginal_likelihood_deriv()
-        print logstring(), "params:", params, "objective:", value, "derivatives:", derivatives
+        print log_string(), "params:", params, "objective:", value, "derivatives:", derivatives
         return -1.0 * value, -1.0 * derivatives
 
 
@@ -521,7 +522,7 @@ class Classifier(object):
             fhat_initial_guess = np.zeros(len(self.data.classification_vector))
         # find the mean of the posterior
         self.fhat, self.a_vec, self.w_sqrt_diag, self.l_matrix \
-            = findfhat(fhat_initial_guess, self.data.cov_matrix, self.data.classification_vector)
+            = find_fhat(fhat_initial_guess, self.data.cov_matrix, self.data.classification_vector)
         # compute derived quantity
         self.r_matrix = compute_r_matrix(self.w_sqrt_diag, self.l_matrix)
 
